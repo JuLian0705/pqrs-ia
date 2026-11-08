@@ -1,0 +1,75 @@
+# Levanta todo el prototipo con un solo comando:  docker compose up --build
+# Frontend: http://localhost:8080   ·   API y documentación: http://localhost:8000/docs
+#
+# La primera vez se descarga el modelo llama3.2:3b (~2 GB). Mientras se descarga,
+# el sistema funciona y clasifica con las reglas de respaldo.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pqrs
+      POSTGRES_PASSWORD: pqrs
+      POSTGRES_DB: pqrs
+    volumes:
+      - datos_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pqrs -d pqrs"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - modelos_ollama:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Tarea de una sola vez: descarga el modelo dentro del volumen de Ollama
+  ollama-modelo:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "llama3.2:3b"]
+    restart: "no"
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://pqrs:pqrs@db:5432/pqrs
+      SECRET_KEY: ${SECRET_KEY:-cambia-esta-clave-secreta-en-produccion-2026}
+      IA_HABILITADA: "true"
+      # Para usar el Ollama instalado en tu PC (más rápido si tienes GPU), cambia a:
+      # OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODELO: llama3.2:3b
+      SEED_DEMO: "true"
+      CORS_ORIGENES: http://localhost:8080,http://localhost:5173
+     #CORS_ORIGENES: https://g6x4777s-8080.use.devtunnels.ms/,https://g6x4777s-5173.use.devtunnels.ms/
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  datos_pg:
+  modelos_ollama:
