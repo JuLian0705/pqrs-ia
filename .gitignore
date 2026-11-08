@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+backend/pqrs.db
+backend/.env
+backend/evaluacion/resultados_*.json
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Sistema
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
